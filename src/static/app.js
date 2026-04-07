@@ -25,7 +25,54 @@ document.addEventListener("DOMContentLoaded", () => {
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <div class="participants-section">
+            <strong>Registered Participants (${details.participants.length}):</strong>
+            <div class="participants-list">
+              ${details.participants.map(participant => `<div class="participant-item" data-participant="${participant}" data-activity="${name}">
+                <span>${participant}</span>
+                <button class="delete-btn" title="Remove participant">×</button>
+              </div>`).join('')}
+            </div>
+          </div>
         `;
+
+        // Add delete event listeners
+        activityCard.querySelectorAll('.delete-btn').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const participantDiv = btn.closest('.participant-item');
+            const participant = participantDiv.dataset.participant;
+            const activity = participantDiv.dataset.activity;
+
+            try {
+              const response = await fetch(
+                `/activities/${encodeURIComponent(activity)}/remove?email=${encodeURIComponent(participant)}`,
+                { method: 'DELETE' }
+              );
+
+              if (response.ok) {
+                participantDiv.remove();
+                // Update participant count
+                const countSpan = activityCard.querySelector('strong');
+                if (countSpan) {
+                  const newCount = activityCard.querySelectorAll('.participant-item').length;
+                  countSpan.textContent = `Registered Participants (${newCount}):`;
+                }
+                // Update availability
+                const availabilityP = activityCard.querySelector('p:nth-of-type(3)');
+                if (availabilityP) {
+                  const newSpotsLeft = details.max_participants - newCount;
+                  availabilityP.textContent = `Availability: ${newSpotsLeft} spots left`;
+                }
+              } else {
+                const error = await response.json();
+                alert('Error: ' + (error.detail || 'Failed to remove participant'));
+              }
+            } catch (error) {
+              alert('Error removing participant: ' + error.message);
+            }
+          });
+        });
 
         activitiesList.appendChild(activityCard);
 
@@ -62,6 +109,7 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
